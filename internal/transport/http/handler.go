@@ -6,7 +6,9 @@ import (
 	"backend/internal/types"
 	"encoding/json"
 	"net/http"
+	"strings"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 )
@@ -37,22 +39,98 @@ func LogginMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func VerifyCustomer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var token = r.Header.Get("x-access-token")
+
+		json.NewEncoder(w).Encode(r)
+		token = strings.TrimSpace(token)
+
+		claims := jwt.MapClaims{}
+		_, err := jwt.ParseWithClaims(token, claims, keyFunc)
+
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode("Invalid Token")
+			return
+		}
+
+		if token == "" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode("Missing auth token")
+			return
+		}
+		role := claims["Role"]
+		if !((role == "CUSTOMER") || (role == "ADMIN")) {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode("Not Authorized")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func VerifyEmployee(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var token = r.Header.Get("x-access-token")
+
+		json.NewEncoder(w).Encode(r)
+		token = strings.TrimSpace(token)
+
+		claims := jwt.MapClaims{}
+		_, err := jwt.ParseWithClaims(token, claims, keyFunc)
+
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode("Error")
+			return
+		}
+
+		if token == "" {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode("Missing auth token")
+			return
+		}
+		role := claims["Role"]
+		if !((role == "EMPLOYEE") || (role == "ADMIN")) {
+			w.WriteHeader(http.StatusForbidden)
+			json.NewEncoder(w).Encode("Not Authorized")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func keyFunc(*jwt.Token) (interface{}, error) {
+	SecretKey := "SECRETKEY"
+	return []byte(SecretKey), nil
+}
+
 func (h *Handler) SetupRotues() {
 	h.Router = mux.NewRouter()
 
+	customerRouter := h.Router.PathPrefix("/customer").Subrouter()
+	employeeRouter := h.Router.PathPrefix("/employee").Subrouter()
+	customerRouter.Use(VerifyCustomer)
+	employeeRouter.Use(VerifyEmployee)
+
 	h.Router.HandleFunc("/register", h.Register).Methods("POST")
 	h.Router.HandleFunc("/login", h.Login).Methods("POST")
-	h.Router.HandleFunc("/customers", h.GetCustomers).Methods("GET")
-	h.Router.HandleFunc("/customer/{id}", h.GetCustomer).Methods("GET")
-	h.Router.HandleFunc("/customer/update/{id}", h.UpdateCustomer).Methods("PATCH")
-	h.Router.HandleFunc("/customer/delete/{id}", h.DeleteCustomer).Methods("DELETE")
+	customerRouter.HandleFunc("/", h.GetCustomers).Methods("GET")
+	customerRouter.HandleFunc("/{id}", h.GetCustomer).Methods("GET")
+	customerRouter.HandleFunc("/update/{id}", h.UpdateCustomer).Methods("PATCH")
+	customerRouter.HandleFunc("/resetPassword/{id}", h.ResetCusPassword).Methods("PATCH")
+	customerRouter.HandleFunc("/delete/{id}", h.DeleteCustomer).Methods("DELETE")
 
-	h.Router.HandleFunc("/employee/register", h.RegisterEmployee).Methods("POST")
+	employeeRouter.HandleFunc("/register", h.RegisterEmployee).Methods("POST")
 	h.Router.HandleFunc("/employee/login", h.EmployeeLogin).Methods("POST")
-	h.Router.HandleFunc("/employee", h.GetEmployees).Methods("GET")
-	h.Router.HandleFunc("/employee/{id}", h.GetEmployee).Methods("GET")
-	h.Router.HandleFunc("/employee/update/{id}", h.UpdateEmployee).Methods("PATCH")
-	h.Router.HandleFunc("/employee/delete/{id}", h.DeleteEmployee).Methods("DELETE")
+	employeeRouter.HandleFunc("/", h.GetEmployees).Methods("GET")
+	employeeRouter.HandleFunc("/{id}", h.GetEmployee).Methods("GET")
+	employeeRouter.HandleFunc("/update/{id}", h.UpdateEmployee).Methods("PATCH")
+	employeeRouter.HandleFunc("/resetPassword/{id}", h.ResetEmpPassword).Methods("PATCH")
+	employeeRouter.HandleFunc("/delete/{id}", h.DeleteEmployee).Methods("DELETE")
 
 	h.Router.Use(LogginMiddleware)
 	h.Router.HandleFunc("/items", h.FetchItems).Methods("GET")

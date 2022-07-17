@@ -55,7 +55,7 @@ func (app *App) Run() error {
 			"*",
 		},
 	})
-	if err := http.ListenAndServe(":8089", corsOpts.Handler(handler.Router)); err != nil {
+	if err := http.ListenAndServe(":4000", corsOpts.Handler(handler.Router)); err != nil {
 		return err
 	}
 

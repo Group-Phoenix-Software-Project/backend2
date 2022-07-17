@@ -11,6 +11,7 @@ type Customer struct {
 	Id          int        `gorm:"primary, autoIncrement" json:"id"`
 	FirstName   string     `json:"firstName"`
 	LastName    string     `json:"lastName"`
+	ContactNo   int        `json:"contactNo"`
 	Email       string     `gorm:"unique" json:"email" validate:"email,required"`
 	Password    string     `json:"password"`
 	Designation string     `json:"designation"`
