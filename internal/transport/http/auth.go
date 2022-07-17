@@ -192,10 +192,10 @@ func (h *Handler) VerifyToken(w http.ResponseWriter, r *http.Request) {
 	h.HandleSuccessRespose(w, token)
 }
 
-func keyFunc(*jwt.Token) (interface{}, error) {
-	SecretKey := "SECRETKEY"
-	return []byte(SecretKey), nil
-}
+// func keyFunc(*jwt.Token) (interface{}, error) {
+// 	SecretKey := "SECRETKEY"
+// 	return []byte(SecretKey), nil
+// }
 
 func (h *Handler) GetCustomer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -244,6 +244,45 @@ func (h *Handler) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.HandleSuccessRespose(w, customer)
+}
+
+func (h *Handler) ResetCusPassword(w http.ResponseWriter, r *http.Request) {
+	var data types.Customer
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		h.HandleErrorRespose(w, "Failed to decode JSON body", err, http.StatusInternalServerError)
+		return
+	}
+
+	if err := verifyPassword(data.Password); err != nil {
+		h.HandleErrorRespose(w, "Invalid Password", err, http.StatusInternalServerError)
+		return
+	}
+
+	cost := 14
+	password, _ := bcrypt.GenerateFromPassword([]byte(data.Password), cost)
+	data.Password = string(password)
+
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	i, err := strconv.ParseUint(id, 10, 64)
+
+	if err != nil {
+		h.HandleErrorRespose(w, "Unable to pass int", err, http.StatusBadRequest)
+		return
+	}
+	var customer types.Customer
+	database.DB.Where("id = ?", i).First(&customer)
+
+	customer.Password = data.Password
+
+	if result := database.DB.Save(&customer); result.Error != nil {
+		h.HandleErrorRespose(w, "Unable to update the customer", result.Error, http.StatusBadRequest)
+		return
+	}
+
+	h.HandleSuccessRespose(w, customer)
+
 }
 
 func (h *Handler) DeleteCustomer(w http.ResponseWriter, r *http.Request) {

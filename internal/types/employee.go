@@ -13,6 +13,7 @@ type Employee struct {
 	LastName    string     `json:"lastName"`
 	Designation string     `json:"designation"`
 	Address     string     `json:"address"`
+	ContactNo   int        `json:"contactNo"`
 	Email       string     `json:"email"`
 	Password    string     `json:"password"`
 	DOB         *time.Time `json:"dob"`
